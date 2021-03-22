@@ -14,3 +14,4 @@ require (
 )
 
 replace github.com/notnoop/raft-wal => ./
+replace github.com/notnoop/raft-wal/log => ./log
