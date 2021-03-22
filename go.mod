@@ -12,5 +12,3 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/wcharczuk/go-chart/v2 v2.1.0
 )
-
-replace github.com/notnoop/raft-wal/log => github.com/ncabatoff/raft-wal/log gomod
