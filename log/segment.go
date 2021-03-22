@@ -538,7 +538,7 @@ func (s *segment) sync() error {
 		return nil
 	}
 
-	return fileutil.Fdatasync(s.f)
+	return s.f.Sync()
 }
 
 func recordPadding(length uint32) uint32 {

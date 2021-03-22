@@ -2,11 +2,10 @@ package log
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
-
-	"github.com/coreos/etcd/pkg/fileutil"
 )
 
 func segmentName(baseIndex uint64) string {
@@ -15,8 +14,23 @@ func segmentName(baseIndex uint64) string {
 
 var pathReg = regexp.MustCompile(`^wal-([0-9a-fA-F]{16}).log$`)
 
+func readDir(dirpath string) ([]string, error) {
+	dir, err := os.Open(dirpath)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+
+	names, err := dir.Readdirnames(-1)
+	if err != nil {
+		return nil, err
+	}
+
+	return names, nil
+}
+
 func segmentsIn(dir string) ([]uint64, error) {
-	files, err := fileutil.ReadDir(dir, fileutil.WithExt(".log"))
+	files, err := readDir(dir)
 	if err != nil {
 		return nil, err
 	}

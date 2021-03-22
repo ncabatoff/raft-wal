@@ -59,7 +59,7 @@ func (f *lockFile) commit() error {
 	}
 
 	if !f.noSync {
-		return fileutil.Fdatasync(f.f)
+		return f.f.Sync()
 	}
 
 	return nil
@@ -85,7 +85,7 @@ func (f *lockFile) startTransaction(c command) error {
 	}
 
 	if !f.noSync {
-		return fileutil.Fdatasync(f.f)
+		return f.f.Sync()
 	}
 
 	return nil

@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
-	"github.com/coreos/etcd/pkg/fileutil"
 )
 
 const defaultLogChunkSize = 4096
@@ -72,7 +70,7 @@ type log struct {
 
 func NewLog(dir string, c LogConfig) (*log, error) {
 
-	dirFile, err := fileutil.OpenDir(dir)
+	dirFile, err := os.Open(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open directory: %v", err)
 	}
@@ -414,5 +412,5 @@ func (l *log) syncDir() error {
 		return nil
 	}
 
-	return fileutil.Fsync(l.dirFile)
+	return l.dirFile.Sync()
 }

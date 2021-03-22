@@ -7,7 +7,6 @@ import (
 	"hash/crc32"
 	"os"
 
-	"github.com/coreos/etcd/pkg/fileutil"
 	"github.com/hashicorp/go-msgpack/codec"
 )
 
@@ -146,7 +145,7 @@ func (w *wal) writeMetaPage() error {
 	}
 
 	if !w.config.NoSync {
-		err = fileutil.Fdatasync(w.metaFile)
+		err = w.metaFile.Sync()
 		if err != nil {
 			return fmt.Errorf("failed to persist meta: %v", err)
 		}
@@ -242,7 +241,7 @@ func (w *wal) createMetaPage(path string) error {
 	}
 
 	if !w.config.NoSync {
-		err = fileutil.Fsync(f)
+		err = f.Sync()
 		if err != nil {
 			return fmt.Errorf("failed to persist meta: %v", err)
 		}
