@@ -1,4 +1,4 @@
-module github.com/notnoop/raft-wal
+module github.com/ncabatoff/raft-wal
 
 go 1.15
 
@@ -13,5 +13,4 @@ require (
 	github.com/wcharczuk/go-chart/v2 v2.1.0
 )
 
-replace github.com/notnoop/raft-wal => ./
-replace github.com/notnoop/raft-wal/log => ./log
+replace github.com/notnoop/raft-wal/log => github.com/ncabatoff/raft-wal/log gomod
