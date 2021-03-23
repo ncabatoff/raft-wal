@@ -333,15 +333,15 @@ func (l *log) TruncateHead(index uint64) error {
 		return nil
 	}
 
-	if index >= l.lastIndex {
-		return fmt.Errorf("deletion would render log empty")
-	}
-
 	err := l.firstIndexUpdatedCallback(index + 1)
 	if err != nil {
 		return err
 	}
-	l.firstIndex = index + 1
+	if index >= l.lastIndex {
+		l.firstIndex, l.lastIndex = 0, 0
+	} else {
+		l.firstIndex = index + 1
+	}
 
 	l.deleteOldLogFiles()
 
