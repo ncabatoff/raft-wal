@@ -24,6 +24,12 @@ func New(dir string) (*wal, error) {
 	return NewWAL(dir, LogConfig{})
 }
 
+type FileWALLog interface {
+	GetSealedLogPath(index uint64) (string, int, error)
+	Close() error
+}
+
+var _ FileWALLog = (*wal)(nil)
 var _ raft.LogStore = (*wal)(nil)
 var _ raft.StableStore = (*wal)(nil)
 
@@ -173,4 +179,8 @@ func (w *wal) DeleteRange(min, max uint64) error {
 
 func (w *wal) Close() error {
 	return w.log.Close()
+}
+
+func (w *wal) GetSealedLogPath(index uint64) (string, int, error) {
+	return w.log.GetSealedLogPath(index)
 }

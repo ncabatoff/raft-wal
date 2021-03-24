@@ -24,6 +24,7 @@ type Log interface {
 	LastIndex() uint64
 
 	GetLog(index uint64) ([]byte, error)
+	GetSealedLogPath(index uint64) (string, int, error)
 	StoreLogs(nextIndex uint64, next func() []byte) error
 
 	TruncateTail(index uint64) error
@@ -186,6 +187,25 @@ func (l *log) segmentFor(index uint64) (*segment, error) {
 	}
 	l.cachedSegment = seg
 	return seg, nil
+}
+
+// GetSealedLogPath returns the path to a WAL segment file that contains index,
+// as well as how many logs it contains,
+// or an error if none is found.  An empty string with nil error is returned
+// if the index is part of the active segment.
+func (l *log) GetSealedLogPath(index uint64) (string, int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.activeSegment.baseIndex <= index {
+		return "", 0, nil
+	}
+
+	s, err := l.segmentFor(index)
+	if err != nil {
+		return "", 0, err
+	}
+	return s.f.Name(), len(s.offsets), nil
 }
 
 func (l *log) GetLog(index uint64) ([]byte, error) {
