@@ -31,7 +31,6 @@ const (
 
 var (
 	errOutOfSequence = errors.New("out of sequence index")
-	errLogNotFound   = errors.New("log entry not found")
 	errWrongSegment  = errors.New("log predates this segment")
 	errSealedFile    = errors.New("file was sealed; cannot be opened for write")
 	errReadOnlyFile  = errors.New("file is read only")
