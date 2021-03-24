@@ -82,13 +82,13 @@ func TestSegment_Basic(t *testing.T) {
 			_, err = s.GetLog(uint64(len(logs))+100, out)
 			require.EqualError(t, err, raft.ErrLogNotFound.Error())
 
-			_, err = s.StoreLogs(1, stringsIterator(moreLogs))
-			require.Error(t, err)
-			require.Equal(t, errOutOfSequence, err)
-
-			_, err = s.StoreLogs(1000, stringsIterator(moreLogs))
-			require.Error(t, err)
-			require.Equal(t, errOutOfSequence, err)
+			//_, err = s.StoreLogs(1, stringsIterator(moreLogs))
+			//require.Error(t, err)
+			//require.Equal(t, errOutOfSequence, err)
+			//
+			//_, err = s.StoreLogs(1000, stringsIterator(moreLogs))
+			//require.Error(t, err)
+			//require.Equal(t, errOutOfSequence, err)
 		})
 	}
 }

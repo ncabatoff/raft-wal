@@ -30,6 +30,7 @@ type Log interface {
 	TruncateHead(index uint64) error
 
 	Close() error
+	SetFirstIndex(uint64) error
 }
 
 type UserLogConfig struct {
@@ -50,6 +51,7 @@ type LogConfig struct {
 	UserLogConfig
 }
 
+// log manages a collection of segment files on disk.
 type log struct {
 	mu      sync.RWMutex
 	dir     string
@@ -58,8 +60,11 @@ type log struct {
 
 	lf *lockFile
 
+	// firstIndex is the first log index known to Raft
 	firstIndex uint64
-	lastIndex  uint64
+	// lastIndex is the last log index known; the next StoreLogs call
+	// must be for an index of lastIndex+1.
+	lastIndex uint64
 
 	segmentBases  []uint64
 	activeSegment *segment
@@ -116,7 +121,7 @@ func NewLog(dir string, c LogConfig) (*log, error) {
 	}
 
 	// delete old files if they present from older run
-	l.deleteOldLogFiles()
+	l.deleteOldLogFilesLocked()
 	l.redoPendingTransaction()
 	l.syncDir()
 
@@ -325,6 +330,14 @@ func (l *log) truncateTailImpl(index uint64) error {
 	return l.lf.commit()
 }
 
+// TruncateHead deletes all entries up to and including index. After returning
+// a non-nil error, l.firstIndex will be index+1.
+
+// TODO:
+// - assumes index falls on a segment boundary
+// - when index == l.lastIndex, we're deleting everything, which is fine, but
+//   we get left with l.firstIndex = l.lastIndex = 0, which means that
+//   subsequent StoreLogs calls will fail with "out of order insertion"
 func (l *log) TruncateHead(index uint64) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -345,12 +358,28 @@ func (l *log) TruncateHead(index uint64) error {
 		l.firstIndex = index + 1
 	}
 
-	l.deleteOldLogFiles()
+	l.deleteOldLogFilesLocked()
 
 	return nil
 }
 
-func (l *log) deleteOldLogFiles() {
+func (l *log) SetFirstIndex(index uint64) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.firstIndex, l.lastIndex = index, index
+
+	for _, sb := range l.segmentBases {
+		fp := filepath.Join(l.dir, segmentName(sb))
+		os.Remove(fp)
+	}
+
+	l.segmentBases = l.segmentBases[:0]
+	l.clearCachedSegment()
+	return l.startNewSegment(l.firstIndex)
+}
+
+func (l *log) deleteOldLogFilesLocked() {
 	delIdx := segmentContainingIndex(l.segmentBases, l.firstIndex)
 
 	toDelete, toKeep := l.segmentBases[:delIdx], l.segmentBases[delIdx:]

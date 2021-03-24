@@ -63,7 +63,17 @@ func NewWAL(dir string, c LogConfig) (*wal, error) {
 	}
 
 	return wal, nil
+}
 
+// SetFirstIndex is used when adding a node to a cluster.  The node will
+// be asked to apply a snapshot, and then SetFirstIndex must be called to
+// inform us what the next log index will be.
+func (w *wal) SetFirstIndex(newIndex uint64) error {
+	err := w.setFirstIndex(newIndex)
+	if err != nil {
+		return err
+	}
+	return w.log.SetFirstIndex(newIndex)
 }
 
 func (w *wal) setFirstIndex(newIndex uint64) error {
@@ -123,7 +133,7 @@ func (w *wal) StoreLogs(logs []*raft.Log) error {
 		i++
 
 		if l.Index != lastIndex+1 {
-			berr = fmt.Errorf("storing non-consequetive logs: %v != %v", l.Index, lastIndex+1)
+			berr = fmt.Errorf("storing non-consecutive logs: %v != %v", l.Index, lastIndex+1)
 			return nil
 		}
 		lastIndex = l.Index

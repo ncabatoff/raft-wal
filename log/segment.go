@@ -347,10 +347,12 @@ func (s *segment) StoreLogs(index uint64, next func() []byte) (int, error) {
 	defer s.writeLock.Unlock()
 
 	s.offsetLock.RLock()
-	if int(index-s.baseIndex) != len(s.offsets) {
-		s.offsetLock.RUnlock()
-		return 0, errOutOfSequence
-	}
+
+	// TODO can we salvage this safety check?
+	//if int(index-s.baseIndex) != len(s.offsets) + s.offsetFudge {
+	//	s.offsetLock.RUnlock()
+	//	return 0, fmt.Errorf("index=%d baseIndex=%d lenOffsets=%d err=%w", index, s.baseIndex, len(s.offsets), errOutOfSequence)
+	//}
 
 	startingOffset := s.nextOffset
 	nextOffset := s.nextOffset
