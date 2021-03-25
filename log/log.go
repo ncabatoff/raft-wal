@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 )
 
@@ -32,6 +33,7 @@ type Log interface {
 
 	Close() error
 	SetFirstIndex(uint64) error
+	SetLastIndex(uint64)
 }
 
 type UserLogConfig struct {
@@ -74,9 +76,11 @@ type log struct {
 	cachedSegment *segment
 
 	firstIndexUpdatedCallback func(uint64) error
+
+	logger hclog.Logger
 }
 
-func NewLog(dir string, c LogConfig) (*log, error) {
+func NewLog(logger hclog.Logger, dir string, c LogConfig) (*log, error) {
 
 	dirFile, err := os.Open(dir)
 	if err != nil {
@@ -103,7 +107,7 @@ func NewLog(dir string, c LogConfig) (*log, error) {
 	var active *segment
 	if len(bases) == 0 {
 		bases = append(bases, 1)
-		active, err = openSegment(filepath.Join(dir, segmentName(1)), 1, true, c)
+		active, err = openSegment(logger, filepath.Join(dir, segmentName(1)), 1, true, c)
 		if err != nil {
 			return nil, err
 		}
@@ -119,6 +123,7 @@ func NewLog(dir string, c LogConfig) (*log, error) {
 		segmentBases:              bases,
 		activeSegment:             active,
 		config:                    c,
+		logger:                    logger,
 	}
 
 	// delete old files if they present from older run
@@ -157,11 +162,15 @@ func (l *log) LastIndex() uint64 {
 func (l *log) segmentFor(index uint64) (*segment, error) {
 	firstIdx, lastIdx := l.firstIndex, l.lastIndex
 
-	if index < firstIdx || index > lastIdx {
-		return nil, raft.ErrLogNotFound
+	if index < firstIdx {
+		return nil, fmt.Errorf("index too small (%d < %d): %w", index, firstIdx, raft.ErrLogNotFound)
+	}
+	if index > lastIdx {
+		return nil, fmt.Errorf("index too big (%d > %d): %w", index, lastIdx, raft.ErrLogNotFound)
 	}
 
-	if index >= l.activeSegment.baseIndex {
+	// TODO remove first clause? we should instead create an activeSegment even when restoring based on another node's logs
+	if l.activeSegment != nil && index >= l.activeSegment.baseIndex {
 		return l.activeSegment, nil
 	}
 
@@ -177,7 +186,7 @@ func (l *log) segmentFor(index uint64) (*segment, error) {
 		return l.cachedSegment, nil
 	}
 
-	seg, err := openSegment(filepath.Join(l.dir, segmentName(sBase)), sBase, false, l.config)
+	seg, err := openSegment(l.logger, filepath.Join(l.dir, segmentName(sBase)), sBase, false, l.config)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +223,7 @@ func (l *log) GetLog(index uint64) ([]byte, error) {
 
 	s, err := l.segmentFor(index)
 	if err != nil {
-		return nil, raft.ErrLogNotFound // fmt.Errorf("no segment found for index=%d: %v", index, err)
+		return nil, raft.ErrLogNotFound
 	}
 
 	out := make([]byte, 1024*1024)
@@ -265,7 +274,7 @@ func (l *log) maybeStartNewSegment() error {
 }
 
 func (l *log) startNewSegment(nextBase uint64) error {
-	active, err := openSegment(filepath.Join(l.dir, segmentName(nextBase)), nextBase, true, l.config)
+	active, err := openSegment(l.logger, filepath.Join(l.dir, segmentName(nextBase)), nextBase, true, l.config)
 	if err != nil {
 		return err
 	}
@@ -397,6 +406,13 @@ func (l *log) SetFirstIndex(index uint64) error {
 	l.segmentBases = l.segmentBases[:0]
 	l.clearCachedSegment()
 	return l.startNewSegment(l.firstIndex)
+}
+
+func (l *log) SetLastIndex(index uint64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.lastIndex = index
 }
 
 func (l *log) deleteOldLogFilesLocked() {

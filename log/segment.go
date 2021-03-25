@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/coreos/etcd/pkg/fileutil"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/raft"
 )
 
@@ -75,15 +76,15 @@ func parseSegmentHeader(b [segment_header_size]byte) (baseIndex uint64, compress
 	return binary.BigEndian.Uint64(b[18:26]), LogCompression(b[17]), sealed, indexOffset, indexRecSize, nil
 }
 
-func openSegment(fp string, baseIndex uint64, forWrite bool, config LogConfig) (*segment, error) {
+func openSegment(logger hclog.Logger, fp string, baseIndex uint64, forWrite bool, config LogConfig) (*segment, error) {
 	if fileutil.Exist(fp) {
-		return openExistingSegment(fp, baseIndex, forWrite, config)
+		return openExistingSegment(logger, fp, baseIndex, forWrite, config)
 	}
 
-	return createSegment(fp, baseIndex, forWrite, config)
+	return createSegment(logger, fp, baseIndex, forWrite, config)
 }
 
-func openExistingSegment(fp string, baseIndex uint64, forWrite bool, config LogConfig) (*segment, error) {
+func openExistingSegment(logger hclog.Logger, fp string, baseIndex uint64, forWrite bool, config LogConfig) (*segment, error) {
 	rdf := os.O_RDONLY
 	if forWrite {
 		rdf = os.O_RDWR
@@ -181,7 +182,7 @@ func (s *segment) loadUnsealedContent() error {
 	return nil
 }
 
-func createSegment(fp string, baseIndex uint64, forWrite bool, config LogConfig) (*segment, error) {
+func createSegment(logger hclog.Logger, fp string, baseIndex uint64, forWrite bool, config LogConfig) (*segment, error) {
 	rdf := os.O_RDONLY
 	if forWrite {
 		rdf = os.O_RDWR
@@ -278,7 +279,7 @@ func (s *segment) GetLog(index uint64, out []byte) (int, error) {
 	if index < s.baseIndex {
 		return 0, errWrongSegment
 	} else if index >= s.baseIndex+uint64(len(s.offsets)) {
-		return 0, raft.ErrLogNotFound
+		return 0, fmt.Errorf("index not in segment (%d > %d+%d): %w", index, s.baseIndex, len(s.offsets), raft.ErrLogNotFound)
 	}
 
 	li := index - s.baseIndex

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-msgpack/codec"
 	"github.com/hashicorp/raft"
 	"github.com/ncabatoff/raft-wal/log"
@@ -21,7 +22,7 @@ var (
 type LogConfig = log.UserLogConfig
 
 func New(dir string) (*wal, error) {
-	return NewWAL(dir, LogConfig{})
+	return NewWAL(nil, dir, LogConfig{})
 }
 
 type FileWALLog interface {
@@ -44,12 +45,14 @@ type wal struct {
 	log    log.Log
 	dir    string
 	config LogConfig
+	logger hclog.Logger
 }
 
-func NewWAL(dir string, c LogConfig) (*wal, error) {
+func NewWAL(logger hclog.Logger, dir string, c LogConfig) (*wal, error) {
 	wal := &wal{
 		dir:    dir,
 		config: c,
+		logger: logger,
 	}
 
 	err := wal.restoreMetaPage(filepath.Join(dir, "meta"))
@@ -59,7 +62,7 @@ func NewWAL(dir string, c LogConfig) (*wal, error) {
 
 	// note that log.NewLog will sync directory, including metapage
 
-	wal.log, err = log.NewLog(dir, log.LogConfig{
+	wal.log, err = log.NewLog(logger, dir, log.LogConfig{
 		KnownFirstIndex:           wal.meta.FirstIndex,
 		FirstIndexUpdatedCallback: wal.setFirstIndex,
 		UserLogConfig:             c,
@@ -80,6 +83,10 @@ func (w *wal) SetFirstIndex(newIndex uint64) error {
 		return err
 	}
 	return w.log.SetFirstIndex(newIndex)
+}
+
+func (w *wal) SetLastIndex(newIndex uint64) {
+	w.log.SetLastIndex(newIndex)
 }
 
 func (w *wal) setFirstIndex(newIndex uint64) error {
