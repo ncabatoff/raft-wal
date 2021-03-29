@@ -239,9 +239,9 @@ func (l *log) StoreLogs(nextIndex uint64, next func() []byte) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	if nextIndex != l.lastIndex+1 {
-		return fmt.Errorf("out of order insertion %v != %v", nextIndex, l.lastIndex+1)
-	}
+	//if nextIndex != l.lastIndex+1 {
+	//	return fmt.Errorf("out of order insertion %v != %v", nextIndex, l.lastIndex+1)
+	//}
 
 	err := l.maybeStartNewSegment()
 	if err != nil {
@@ -377,17 +377,25 @@ func (l *log) TruncateHead(index uint64) error {
 		return nil
 	}
 
-	err := l.firstIndexUpdatedCallback(index + 1)
-	if err != nil {
-		return err
-	}
+	l.firstIndex = index + 1
 	if index >= l.lastIndex {
-		l.firstIndex, l.lastIndex = 0, 0
-	} else {
-		l.firstIndex = index + 1
+		l.firstIndex = 1
+		l.lastIndex = 1
 	}
 
 	l.deleteOldLogFilesLocked()
+	if l.firstIndex == 1 {
+		l.clearCachedSegment()
+		err := l.startNewSegment(1)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := l.firstIndexUpdatedCallback(l.firstIndex)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -457,7 +465,7 @@ func (l *log) clearCachedSegment() error {
 	l.cachedSegment = nil
 
 	if c != nil {
-		return l.cachedSegment.Close()
+		return c.Close()
 	}
 	return nil
 }
